@@ -1,0 +1,45 @@
+build:
+  python_version: "3.8"
+  run:
+    - pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
+    - pip install einops beartype packaging accelerate
+
+predict: 
+  python: |
+    from voicebox_pytorch import (
+        VoiceBoxTrainer,
+        ConditionalFlowMatcherWrapper,
+        EncodecVoco,
+        VoiceBox,
+        DurationPredictor
+    )
+    from spear_tts_pytorch import TextToSemantic
+    from audiolm_pytorch import HubertWithKmeans
+    import torch
+
+    # Aquí podrías cargar tu modelo preentrenado
+    model_path = "ruta/a/tu/modelo.pth"
+
+    # Configurar el modelo con los parámetros adecuados
+    audio_enc_dec = EncodecVoco()
+    voicebox_model = VoiceBox(audio_enc_dec=audio_enc_dec)
+
+    cfm_wrapper = ConditionalFlowMatcherWrapper(voicebox=voicebox_model)
+
+    # Cargar el estado del modelo
+    checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+    cfm_wrapper.load_state_dict(checkpoint['model'])
+
+    # Configurar el entrenador
+    trainer = VoiceBoxTrainer(
+        cfm_wrapper=cfm_wrapper,
+        batch_size=8, 
+        dataset=None,  # Aquí debes cargar tu dataset
+        num_train_steps=10000,
+        lr=3e-4
+    )
+
+    # Ejecutar la predicción
+    def predict(text: str):
+        audio = trainer.generate(texts=[text])
+        return audio
